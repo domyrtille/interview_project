@@ -1,0 +1,50 @@
+# As we don't use any spcific language, the value doesn't matter
+language: go
+
+env:
+  global:
+  # From https://www.cloudsavvyit.com/12441/what-is-dockers-buildkit-and-why-does-it-matter/
+  # BUILDKIT focuses on improving build performance, storage management and other things by using parallel processing, 
+  # more advanced caching and automatic garbage collection. 
+  # These combine into a build system that’s more efficient and more extensible than the original engine.
+  - DOCKER_BUILDKIT=1
+  - LTC_VERSION=0.18.1
+
+services:
+  - docker
+
+# Update docker to latest version since Travis uses Docker 18.06
+# And Buildkit is available from 18.09 version
+# https://docs.docker.com/develop/develop-images/build_enhancements/
+before_install:
+  - curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo apt-key add -
+  - sudo add-apt-repository "deb [arch=amd64] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable"
+  - sudo apt-get update
+  - sudo apt-get -y -o Dpkg::Options::="--force-confnew" install docker-ce
+
+before_script:
+  # Dockerfile Linter
+  - docker run --rm -i hadolint/hadolint < Dockerfile
+  # Validation tool for Kubernetes yaml file
+  - docker run --rm -v $(pwd):/project garethr/kubeval "/project/kube/ltc_statefulset.yaml"
+  # Kubernetes linter. The two ignores are because we need a full kubernetes template with service and pod security to avoid those
+  - docker run -v $(pwd):/project zegl/kube-score:v1.10.0 score --ignore-test pod-networkpolicy --ignore-test statefulset-has-servicename kube/*.yaml
+
+script:
+  # Build the image with version given in ENV variable
+  - docker build --no-cache -t baymaxx/ltc_node:$LTC_VERSION .
+  # Tag version as latest to be pull by specific team
+  - docker tag baymaxx/ltc_node:$LTC_VERSION baymaxx/ltc_node:latest
+  # Save image as tar to check for vulns
+  - docker image save -o ltc_node.tar baymaxx/ltc_node:$LTC_VERSION
+  # Test image for Vuln with Anchore/Grype with saved image and fail if any CVEs are at least medium
+  - docker run --rm -v $(pwd):/project anchore/grype --fail-on medium docker-archive:/project/ltc_node.tar
+
+# Without knowing process to deploy
+# Will consider pushing to registry the deployment part
+# Otherwise, for example, we could add some kubectl command to update the statefulset
+after_success:
+  # Connect to docker to push image
+  - echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin
+  - docker push baymaxx/ltc_node:$LTC_VERSION
+  - docker push baymaxx/ltc_node:latest
