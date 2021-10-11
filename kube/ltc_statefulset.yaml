@@ -1,0 +1,101 @@
+---
+# Inspired from
+# https://docs.openshift.com/enterprise/3.1/install_config/persistent_storage/persistent_storage_aws.html
+# 78G since the all LTC blockchain is around 64G which represent 6.4G/year
+# So it will allow us at leat 2 year if we don't want to change the disk
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: ltc_node_pv
+spec:
+  capacity:
+    storage: 78Gi
+  accessModes:
+    - "ReadWriteOnce"
+  awsElasticBlockStore: 
+    fsType: ext4
+    volumeID: "id_of_the_ebs_created_beforehand" 
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: ltc_node_pvc
+spec:
+  accessModes:
+    - "ReadWriteOnce"
+  resources:
+    requests:
+      storage: 75Gi
+  volumeName: ltc_node_pv
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  namespace: litecoin
+  name: litecoin_node
+  labels:
+    app: litecoin_node
+    version: '0.18.1'
+spec:
+  # For a StatefulSet to work, it needs a Headless Service. A Headless Service does not have an IP address. 
+  # Internally, it creates the necessary endpoints to expose pods with DNS names. 
+  # Service needs to be created beforehand
+  serviceName: "ltc_node_svc"
+  replicas: 1
+  selector:
+    # Should be the same as the container name
+    matchLabels:
+      app: ltc_node
+  template:
+    metadata:
+      labels:
+        app: ltc_node
+    spec:
+      securityContext:
+        # To avoid conflicts with the host
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001 # all processes of the container are also part of the supplementary group ID 10001
+      # This setting defines how long should Kubernetes wait after sending the shutdown signal to the pod before forcing deleting it. 
+      terminationGracePeriodSeconds: 10
+      containers:
+      - name: ltc_node
+        # 
+        image: baymaxx/ltc_node:0.18.1
+        command: ["litcoind"]
+        args: [""] # If on any env we want to add args to the command
+        imagePullPolicy: Always
+        resources:
+          requests:
+            cpu: 0.5
+            memory: 256Mi
+          limits:
+            cpu: 1
+            memory: 512Mi
+        # Check if the container is ready to be used
+        readinessProbe:
+          tcpSocket:
+            port: ltc_port
+          # The kubelet will send the first readiness probe 5 seconds after the container start
+          initialDelaySeconds: 5
+          # The kubelet will continue to run this check every 10 seconds.
+          periodSeconds: 10
+        ports:
+          - name: ltc_port
+            containerPort: 9333
+          - name: ltc_rpc
+            containerPort: 9332
+          - name: ltc_testnet
+            containerPort: 19335
+          - name: ltc_testnet_rpc
+            containerPort: 19332
+        volumeMounts:
+        - mountPath: /litecoin/.litecoin
+          name: data_node_ltc
+        securityContext:
+          readOnlyRootFilesystem: true
+          allowPrivilegeEscalation: false
+      volumes:
+      - name: mypd
+        persistentVolumeClaim:
+          claimName: ltc_node_pvc
