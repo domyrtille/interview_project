@@ -37,7 +37,8 @@ metadata:
     app: litecoin_node
     version: '0.18.1'
 spec:
-  # For a StatefulSet to work, it needs a Headless Service. A Headless Service does not have an IP address. 
+  # https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/
+  # StatefulSets currently require a Headless Service to be responsible for the network identity of the Pods.
   # Internally, it creates the necessary endpoints to expose pods with DNS names. 
   # Service needs to be created beforehand
   serviceName: "ltc_node_svc"
@@ -51,8 +52,9 @@ spec:
       labels:
         app: ltc_node
     spec:
+      # https://kubernetes.io/docs/concepts/policy/pod-security-policy/
       securityContext:
-        # To avoid conflicts with the host
+        # User as 10001 ID to avoid conflicts with the host
         runAsUser: 10001
         runAsGroup: 10001
         fsGroup: 10001 # all processes of the container are also part of the supplementary group ID 10001
@@ -92,6 +94,7 @@ spec:
         volumeMounts:
         - mountPath: /litecoin/.litecoin
           name: data_node_ltc
+        # Security to avoid 
         securityContext:
           readOnlyRootFilesystem: true
           allowPrivilegeEscalation: false
