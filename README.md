@@ -12,7 +12,8 @@
 
 ### Dockerfile
 The [dockerfile](https://github.com/domyrtille/interview/blob/main/Dockerfile) with a multi-build stage will build an image for a LTC node with the necessaries libs and security to make it works and secure
-The final image is based on an Ubuntu folca which, right now as now CVE's above low, which compared to Alpine is better
+
+The final image is based on an Ubuntu focal which, right now as no CVEs above low, which compared to Alpine is better
 
 
 ### Kubernetes
@@ -47,8 +48,8 @@ The other steps once tests have been done and passed:
  - we push the image to a public registry, mostly for demo purposes, otherwise it will be pushed on a private repo, either on managed service or internal one
 
 
-Last step is to use Anchore/grype tool to analyse the image built for any CVE's. It has been configured so that if any CVEs are at least medium, it will faild the build
-Like that we can work on it and repush on fixed
+Last step is to use Anchore/grype tool to analyse the image built for any CVEs. It has been configured so that if any CVEs are at least medium, it will faild the build
+Like that we can work on it/patch iit and repush once fixed
 
 ```bash
 NAME        INSTALLED                 FIXED-IN  VULNERABILITY     SEVERITY   
@@ -80,8 +81,8 @@ passwd      1:4.8.1-1ubuntu5.20.04.1            CVE-2013-4235     Low
 
 ### Script
 #### CLI
-I used one of my use case I had recently (quite modified for obvious reaons).
-We have lot of Big log files and sometimes we need to grep all IPs in it and modify them by something else that our system can understand
+I used one of the use cases I had recently (quite modified for obvious reaons).
+We have lot of big log files and sometimes we need to grep all IPs in it and modify them by something else that our system can understand
 For that, I used different CLIs to do it:
 
     # Sometimes some computer can have disk/io issue so I remove all the line after 10000 (for example)
@@ -105,14 +106,34 @@ For that, I used different CLIs to do it:
 
 If there is an issue, to be able to track IP on the plateform, from different campaign to different system, check if it appear somewhere else and if it's normal
 
-#### Python
+### Python 
+
 
 ### Terraform
 Everything on our [Terraform module](https://github.com/domyrtille/interview/tree/main/terraform_module_prod_ci) has been done to create everything on AWS
 
+```bash
+module.iam.aws_iam_group.prod_ci_group: Creating...
+module.iam.aws_iam_user.prod_ci_user: Creating...
+module.iam.aws_iam_role.prod_ci_role: Creating...
+module.iam.aws_iam_group.prod_ci_group: Creation complete after 0s [id=prod_ci_group]
+module.iam.aws_iam_user.prod_ci_user: Creation complete after 0s [id=prod_ci_user]
+module.iam.aws_iam_user_login_profile.prod_ci_user_login: Creating...
+module.iam.aws_iam_group_membership.prod_ci_group_members: Creating...
+module.iam.aws_iam_user_login_profile.prod_ci_user_login: Creation complete after 1s [id=prod_ci_user]
+module.iam.aws_iam_group_membership.prod_ci_group_members: Creation complete after 1s [id=prod_ci_group_members]
+module.iam.aws_iam_role.prod_ci_role: Creation complete after 1s [id=prod_ci_role]
+module.iam.data.aws_iam_policy_document.prod_ci_group_iam_policy: Reading...
+module.iam.data.aws_iam_policy_document.prod_ci_group_iam_policy: Read complete after 0s [id=1511724429]
+module.iam.aws_iam_group_policy.prod_ci_iam_group_policy: Creating...
+module.iam.aws_iam_group_policy.prod_ci_iam_group_policy: Creation complete after 1s [id=prod_ci_group:prod_ci_iam_group_policy]
+
+Apply complete! Resources: 6 added, 0 changed, 0 destroyed.                            
+```
+
 ### Optimization TODO
   - Cache docker image in travis to avoid Dl at each build
-  - A script that change the LTC_Version fron 0.18.1 to 0.18.1.$Gitcommit if any optimization need to be done on the image
-  - Bootstrap data inside the container to speed the sync
+  - A script that change the LTC_Version fron 0.18.1 to 0.18.1.$Gitcommit if any optimization needs to be done on the image
+  - Bootstrap.dat data inside the container to speed the sync with LTC network
     - https://litecoin.info/index.php/Bootstrap.dat
   - Better argument and cli with python script
